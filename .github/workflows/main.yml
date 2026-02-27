@@ -33,12 +33,12 @@ jobs:
 
           # Validate YAML (heredoc)
           python - <<'PY'
-import sys, yaml
-p = "template.yaml"
-try:
-    yaml.safe_load(open(p))
-except Exception as e:
-    print("YAML parse error:", e)
-    sys.exit(1)
-print("YAML OK")
-PY
+          import sys, yaml
+          p = "template.yaml"
+          try:
+              yaml.safe_load(open(p))
+          except Exception as e:
+              print("YAML parse error:", e)
+              sys.exit(1)
+          print("YAML OK")
+          PY
