@@ -10,3 +10,5 @@ I wrote a CI gate: a small Actions workflow checks template.yaml exists and pars
 I kept running into errors when running the workflow and at first, the issue was caused by incorrect indentation of the python block which caused it not to wrap correctly  so the Actions rejected the whole workflow
 
 Another issue i ran into was the  workflow not detecting the template.yaml so i created in the repo root on main and re-ran the check. 
+
+Next I made GitHub block merges into main unless that tiny CI job (the template validator) is green and a reviewer has approved the PR by implementing the check as an Actions workflow and enforcing it via branch protection in the repo settings of GitHub.
