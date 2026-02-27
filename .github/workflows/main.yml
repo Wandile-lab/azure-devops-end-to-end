@@ -13,12 +13,13 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v4
         with:
           python-version: '3.x'
 
-      - name: Ensure template exists
+      - name: Ensure template exists and validate YAML
         run: |
+          set -euo pipefail
           TEMPLATE_PATH="template.yaml"
           if [ ! -f "$TEMPLATE_PATH" ]; then
             echo "ERROR: $TEMPLATE_PATH not found"
@@ -26,26 +27,18 @@ jobs:
           fi
           echo "Found $TEMPLATE_PATH"
 
-      - name: Validate YAML syntax
-        run: |
-          pip install pyyaml
-          python3 -c "
-import sys
-import yaml
+          # Install pyyaml using python -m pip for reliability
+          python -m pip install --upgrade pip
+          python -m pip install pyyaml
 
-template_path = 'template.yaml'
+          # Validate YAML (heredoc)
+          python - <<'PY'
+import sys, yaml
+p = "template.yaml"
 try:
-    with open(template_path, 'r') as f:
-        yaml.safe_load(f)
-    print(f'✓ YAML validation passed for {template_path}')
-except FileNotFoundError:
-    print(f'ERROR: File not found: {template_path}')
-    sys.exit(1)
-except yaml.YAMLError as e:
-    print(f'ERROR: YAML parse error in {template_path}:')
-    print(e)
-    sys.exit(1)
+    yaml.safe_load(open(p))
 except Exception as e:
-    print(f'ERROR: Unexpected error: {e}')
+    print("YAML parse error:", e)
     sys.exit(1)
-          "
+print("YAML OK")
+PY
