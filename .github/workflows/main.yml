@@ -29,23 +29,23 @@ jobs:
       - name: Validate YAML syntax
         run: |
           pip install pyyaml
-          python3 << 'EOF'
+          python3 -c "
 import sys
 import yaml
 
-template_path = "template.yaml"
+template_path = 'template.yaml'
 try:
     with open(template_path, 'r') as f:
         yaml.safe_load(f)
-    print(f"✓ YAML validation passed for {template_path}")
+    print(f'✓ YAML validation passed for {template_path}')
 except FileNotFoundError:
-    print(f"ERROR: File not found: {template_path}")
+    print(f'ERROR: File not found: {template_path}')
     sys.exit(1)
 except yaml.YAMLError as e:
-    print(f"ERROR: YAML parse error in {template_path}:")
+    print(f'ERROR: YAML parse error in {template_path}:')
     print(e)
     sys.exit(1)
 except Exception as e:
-    print(f"ERROR: Unexpected error: {e}")
+    print(f'ERROR: Unexpected error: {e}')
     sys.exit(1)
-EOF
+          "
