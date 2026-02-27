@@ -1,1 +1,12 @@
 # azure-devops-end-to-end
+Rough Draft
+
+I configured a YAML-based CI that triggers on push/PR, uses hosted runners to install dependencies, starts required services (when needed), runs the test suite, and fails fast so broken code doesn’t reach main. I secure credentials via repository secrets and keep jobs small for fast feedback.
+
+I used GitHub Environments to gate deployments: jobs that target environment: production require named reviewers and the CI workflow to pass; branch protection enforces required status checks so nothing merges without green CI.
+
+I wrote a CI gate: a small Actions workflow checks template.yaml exists and parses; branch protection requires that workflow to pass before merging to main. It gives the same policy enforcement as Azure's required-template check but in GitHub’s model.
+
+I kept running into errors when running the workflow and at first, the issue was caused by incorrect indentation of the python block which caused it not to wrap correctly  so the Actions rejected the whole workflow
+
+Another issue i ran into was the  workflow not detecting the template.yaml so i created in the repo root on main and re-ran the check. 
