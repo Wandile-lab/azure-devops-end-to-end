@@ -36,7 +36,8 @@ jobs:
           import sys, yaml
           p = "template.yaml"
           try:
-              yaml.safe_load(open(p))
+              with open(p) as f:
+                  yaml.safe_load(f)
           except Exception as e:
               print("YAML parse error:", e)
               sys.exit(1)
