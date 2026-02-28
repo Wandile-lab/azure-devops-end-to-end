@@ -12,3 +12,7 @@ I kept running into errors when running the workflow and at first, the issue was
 Another issue i ran into was the  workflow not detecting the template.yaml so i created in the repo root on main and re-ran the check. 
 
 Next I made GitHub block merges into main unless that tiny CI job (the template validator) is green and a reviewer has approved the PR by implementing the check as an Actions workflow and enforcing it via branch protection in the repo settings of GitHub.
+
+I gated deployments by targeting GitHub Environments from deployment jobs. Test deploys run automatically; prod deploys pause until an approved reviewer authorizes the job—same control as Azure DevOps environment approvals.
+
+I split CI and CD. CI validates repo policy and templates. CD is a separate workflow with test and production deployment jobs; production targets a protected GitHub Environment so deployments pause until approval.
