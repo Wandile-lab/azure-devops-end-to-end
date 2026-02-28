@@ -1,33 +1,135 @@
-# azure-devops-end-to-end
-Rough Draft
+# azure-devops-end-to-end — CI/CD & gated deployments (GitHub Actions)
 
+## Summary
+An end-to-end CI/CD pipeline using GitHub Actions that reproduces Azure DevOps–style governance: gated deployments, environment-scoped secrets, human approvals, and auditable artifacts without requiring a cloud subscription. The pipeline demonstrates CI, gated CD, environment-scoped secrets, human approvals, and verifiable artifacts.
 
-I configured a YAML-based CI that triggers on push/PR, uses hosted runners to install dependencies, starts required services (when needed), runs the test suite, and fails fast so broken code doesn’t reach main. I secure credentials via repository secrets and keep jobs small for fast feedback.
+GitHub → primary runner and workflows.
+Azure DevOps → conceptual mapping for enterprise readers.
+Microsoft Azure → referenced as the original target in the project (no subscription available).
 
-Azure DevOps Environments and Approvals were implemented using GitHub Actions Environments due to lack of Azure subscription. The same deployment gating, secret scoping, and human approval controls were demonstrated and verified via production deployment pause and artifact generation
+```md
+**Enterprise equivalence:** 
+This project mirrors common Azure DevOps controls (environments, approvals, service connections) using GitHub-native primitives, making it suitable for governance demos and learning without Azure access.
+```
 
-I used GitHub Environments to gate deployments: jobs that target environment: production require named reviewers and the CI workflow to pass; branch protection enforces required status checks so nothing merges without green CI.
+## Quick Start 
 
-I wrote a CI gate: a small Actions workflow checks template.yaml exists and parses; branch protection requires that workflow to pass before merging to main. It gives the same policy enforcement as Azure's required-template check but in GitHub’s model.
+```bash
+git clone https://github.com/<you>/azure-devops-end-to-end
+cd azure-devops-end-to-end
+git push origin main
+```
 
-I kept running into errors when running the workflow and at first, the issue was caused by incorrect indentation of the python block which caused it not to wrap correctly  so the Actions rejected the whole workflow
+## What I built (TL;DR)
 
-Another issue i ran into was the  workflow not detecting the template.yaml so i created in the repo root on main and re-ran the check. 
+CI: YAML-based workflow that runs on push/PR, installs deps, runs tests, fails fast.
 
-Next I made GitHub block merges into main unless that tiny CI job (the template validator) is green and a reviewer has approved the PR by implementing the check as an Actions workflow and enforcing it via branch protection in the repo settings of GitHub.
+Policy check: tiny required-template-check job verifies template.yaml exists and parses YAML.
 
-I gated deployments by targeting GitHub Environments from deployment jobs. Test deploys run automatically; prod deploys pause until an approved reviewer authorizes the job—same control as Azure DevOps environment approvals.
+Branch protection: main protected so merges require the required-template-check status to pass and a PR review.
 
-I split CI and CD. CI validates repo policy and templates. CD is a separate workflow with test and production deployment jobs; production targets a protected GitHub Environment so deployments pause until approval.
+CD (gated): separate deploy-pipeline workflow with build → deploy_test → deploy_prod jobs. deploy_prod uses environment: production so it pauses for explicit approval.
 
-I replaced the Azure DevOps service connection with GitHub Actions + workload identity federation (OIDC). I configured an Entra app with a federated credential for the repo, assigned a scoped role, and used azure/login to exchange a short-lived OIDC token for Azure access — no long-lived secrets. WHY: Environment secrets are only released to runs that target the environment and are gated by approvals. That mirrors Azure’s service-connection scoping.
+Secrets & scope: production secrets are stored as environment secrets (not repo-level) and only released to runs that target the environment after approval.
 
-I implemented a gated CD job in GitHub Actions that targets a protected production environment and conditionally performs a demo deploy when cloud creds are absent, preserving the same approval & audit model as Azure DevOps
+Artifact proof: deployment writes DEPLOY_SUMMARY.txt and uploads it as an artifact for auditors/reviewers to download.
 
-I gated production with a protected GitHub Environment; deployment jobs target environment: production so runs pause until an approver authorizes the deployment—then the job continues with the scoped secrets, preserving auditability and least privilege.
+## Why this matters
 
-I added a gated CD job that produces an artifact on successful deploy so stakeholders can download the build output; this preserves auditability and mirrors Azure DevOps artifacts
+Keeps the same control plane as Azure DevOps: automated checks + human gate before production.
 
-SUmmary:
-I implemented gated CD: jobs target GitHub Environments so deployments pause for human approval; post-approval they run with scoped environment secrets and produce an artifact naming the run — mirroring Azure DevOps release governance.”
-(GitHub ↔ Azure DevOps)
+Demonstrates secure secret scoping, auditable approvals, and deterministic workflows without needing a cloud subscription.
+
+Easily switchable to a real cloud auth method later (OIDC / service principal) with minimal YAML changes.
+
+## Key decisions (and the why)
+
+Split CI and CD (separate workflows) — CI validates code and policy; CD performs deploys. Separating simplifies debugging and aligns with best practice.
+
+Use GitHub Environments + environment secrets — enforces approvals and restricts secrets to approved runs. Mirrors Azure environment scoping.
+
+Small, focused jobs — fail fast, quick feedback (unit tests on push, heavier integration runs scheduled or on PR).
+
+Demo fallback mode — without Azure subscription, deploy job conditionally does a harmless demo deploy (DEMO secret) and creates an artifact. This preserves the entire governance flow for demos.
+
+Pin major versions of actions (e.g., actions/checkout@v4, actions/setup-python@v4) — reduce surprise breakage.
+
+## Challenges (and fixes)
+
+No Azure subscription → I initially planned on using Azure. Fix: implement demo deploy fallback and environment-scoped secrets so the pipeline behavior is identical for governance testing.
+
+YAML indentation error (python heredoc) → Actions rejected the file. Fix: correct indentation and use actions/setup-python so Python blocks run cleanly.
+
+template.yaml not detected → check file path; it must live at the path the validator expects (root by default). Fix: add template.yaml to repo root on main.
+
+Policy enforcement gap → branch-protection was added after the workflow had an initial run (status checks must exist first). Fix: commit and run the validator before adding branch protection.
+
+## How it works — core files & snippets
+
+1) Template check workflow (.github/workflows/required-template-check.yml)
+
+   Runs on push/PR to main
+
+   Ensures template.yaml exists and parses with pyyaml
+
+   Fail-fast status that becomes a required status check for main
+
+2) Deploy pipeline (.github/workflows/deploy-pipeline.yml)
+
+   Jobs: build → deploy_test (environment: test) → deploy_prod (environment: production)
+
+   deploy_prod has environment: production so GitHub pauses and requires approver action
+
+   deploy_prod loads secrets from the production environment and runs:
+
+   Demo path when AZURE_SUBSCRIPTION_ID=DEMO
+
+   Real path (commented) to replace with az commands when real creds available
+
+   Uploads demo-deploy/DEPLOY_SUMMARY.txt via actions/upload-artifact@v4
+
+## Security & best practices 
+
+- Never echo secrets to logs. Always write secrets to $GITHUB_ENV or use them directly in commands that don’t print them.
+
+- Use environment secrets for production, not repo-level secrets — environment secrets are only released to runs that target the environment and are gated by approvals.
+
+- Prefer OIDC / workload identity federation over long-lived client secrets when you have control of the Azure tenant. If OIDC is not possible, use a least-privilege service principal and store its secret as an environment secret.
+
+- Pin actions to a major version (e.g., @v4) to avoid unexpected breaking changes. Consider SHA pinning for critical workflows.
+
+- Require a run before branch protection — status checks must exist (have run at least once) before they can be selected in branch protection.
+
+- Least privilege for RBAC — scope cloud roles (resource-group level) rather than subscription-wide Owner where possible.
+
+- Artifact metadata — include branch, commit SHA, and github.run_id in DEPLOY_SUMMARY.txt so artifacts are self-describing.
+
+## Mapping to Azure DevOps (quick reference)
+
+|Azure DevOps                            |Concept	GitHub Actions equivalent
+|----------------------------------------|-----------------------------------------------------------------------------------
+|Pipeline (YAML)	                       |Workflow YAML (.github/workflows/*.yml)
+|Environments → Approvals & checks	     |GitHub Environments + required reviewers
+|Service Connection (ARM)	               |OIDC federation (azure/login) or environment secrets (service principal fallback)
+|Branch policies: Build validation	     |Branch protection → required status checks
+|Pipeline artifacts	                     |actions/upload-artifact
+
+## How to reproduce 
+
+- Add required-template-check.yml and commit to main → run it.
+
+- Add branch protection for main and require required-template-check status + 1 PR review.
+
+- Create test and production environments under Settings → Environments. Add required reviewers for production.
+
+- Add environment secrets for production (e.g., AZURE_* = DEMO).
+
+- Add deploy-pipeline.yml with environment: set on deploy jobs. Commit.
+
+- Approve the paused deploy_prod run and inspect logs and artifact.
+
+## Evidence & what I produced
+
+- Pipeline run that demonstrates: build, test, test-deploy, prod-deploy (paused), approval, resume, artifact upload.
+
+- demo-deploy/DEPLOY_SUMMARY.txt artifact containing deployment timestamp 
