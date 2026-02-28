@@ -18,3 +18,5 @@ I gated deployments by targeting GitHub Environments from deployment jobs. Test 
 I split CI and CD. CI validates repo policy and templates. CD is a separate workflow with test and production deployment jobs; production targets a protected GitHub Environment so deployments pause until approval.
 
 I replaced the Azure DevOps service connection with GitHub Actions + workload identity federation (OIDC). I configured an Entra app with a federated credential for the repo, assigned a scoped role, and used azure/login to exchange a short-lived OIDC token for Azure access — no long-lived secrets
+
+I emulated the Azure service connection using GitHub Environments and secrets: the workflow reads environment secrets and conditionally performs a demo deploy or a production deploy, keeping approvals and branch protection intact — so the pipeline’s control flow and audit trail match production even without a cloud subscription.
