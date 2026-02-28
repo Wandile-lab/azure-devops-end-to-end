@@ -24,5 +24,27 @@ jobs:
     needs: deploy_test
     environment: production
     steps:
-      - name: Deploy to Production
-        run: echo "Deploying to PRODUCTION environment"
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Load production secrets into env (no echo)
+        run: |
+            echo "AZURE_SUBSCRIPTION_ID=${{ secrets.AZURE_SUBSCRIPTION_ID }}" >> $GITHUB_ENV
+            echo "AZURE_CLIENT_ID=${{ secrets.AZURE_CLIENT_ID }}" >> $GITHUB_ENV
+            echo "AZURE_TENANT_ID=${{ secrets.AZURE_TENANT_ID }}" >> $GITHUB_ENV
+    
+      - name: Demo or real deploy (safe)
+        run: |
+            set -euo pipefail
+            if [ "${AZURE_SUBSCRIPTION_ID:-}" = "DEMO" ]; then
+              echo "=== DEMO DEPLOY: no Azure subscription available ==="
+              mkdir -p demo-deploy
+              echo "deployed at $(date -u)" > demo-deploy/DEPLOY_SUMMARY.txt
+              ls -l demo-deploy
+            else
+              echo "=== REAL DEPLOY: would run az commands (skipped in demo) ==="
+              # Example real commands commented out:
+              # az login --service-principal -u "$AZURE_CLIENT_ID" -p "$AZURE_CLIENT_SECRET" --tenant "$AZURE_TENANT_ID"
+              # az account set --subscription "$AZURE_SUBSCRIPTION_ID"
+              # az deployment group create --resource-group myRG --template-file template.yaml
+            fi
